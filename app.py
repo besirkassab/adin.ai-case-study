@@ -8,8 +8,24 @@ from flask import Flask, request, Response
 
 app = Flask(__name__)
 
-def create_queries_for_campaign_card(engine, campaign_id, start_date, end_date):
+def is_campaign_exist(engine, campaign_id):
     query_campaign_exist = "SELECT campaign_name FROM tbl_daily_campaigns WHERE campaign_id = :campaign_id"
+
+    with engine.connect() as conn:
+        campaign_exist_df = pd.read_sql(text(query_campaign_exist), conn, params={'campaign_id': campaign_id})
+        if campaign_id and campaign_exist_df.empty:
+            return False
+    return True
+
+
+def get_campaign_name(engine, campaign_id):
+    query_retrieve_campaign_name = "SELECT campaign_name FROM tbl_daily_campaigns WHERE campaign_id = :campaign_id"
+
+    with engine.connect() as conn:
+        campaign_exist_df = pd.read_sql(text(query_retrieve_campaign_name), conn, params={'campaign_id': campaign_id})
+    return campaign_exist_df["campaign_name"].iloc[0]
+
+def create_queries_for_campaign_card(engine, campaign_id, start_date, end_date):
     query_campaigns = """
     SELECT * FROM tbl_daily_campaigns
     WHERE date >= :start_date AND date <= :end_date
@@ -19,11 +35,9 @@ def create_queries_for_campaign_card(engine, campaign_id, start_date, end_date):
     SELECT * FROM tbl_daily_scores
     WHERE date >= :start_date AND date <= :end_date
     """
-    
-    with engine.connect() as conn:
-        campaign_exist_df = pd.read_sql(text(query_campaign_exist), conn, params={'campaign_id': campaign_id})
 
-        if not campaign_exist_df.empty:
+    with engine.connect() as conn:
+        if campaign_id:
             query_campaigns += " AND campaign_id = :campaign_id"
             query_scores += " AND campaign_id = :campaign_id"
             
@@ -59,11 +73,24 @@ def get_campaigns():
     campaign_id = request.args.get('campaign_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    
+
+    # Calculate the total days in the date range
+    start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
+    end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    if start_date_dt > end_date_dt:
+        return Response(json.dumps({"detail": "Start date should not be higher than end date."}), status=422, mimetype='application/json')
+
+    total_days = (end_date_dt - start_date_dt).days
+
     # Establish database connection
     engine = get_engine()
 
     # Define and Execute SQL queries, then load them into DF
+    bool_campaign_exist = is_campaign_exist(engine=engine, campaign_id=campaign_id)
+
+    if not bool_campaign_exist:
+        return Response(json.dumps({"detail": "Campaign id could not be found. You can remove campaign id to get all campaigns."}), status=422, mimetype='application/json')
+    
     campaigns_df, scores_df = create_queries_for_campaign_card(engine=engine, campaign_id=campaign_id, start_date=start_date, end_date=end_date)
 
     # Ensure 'date' columns are datetime objects
@@ -73,19 +100,19 @@ def get_campaigns():
     # Merge dataframes on campaign_id and date
     merged_df = pd.merge(campaigns_df, scores_df, on=['campaign_id', 'date'])
 
-    # Calculate the total days in the date range
-    start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
-    total_days = (end_date_dt - start_date_dt).days
-
     # Aggregate metrics
-    if campaign_id:
-        campaign_name = merged_df['campaign_name_x'].iloc[0]
+    if not campaign_id:
+        campaign_name = 'All'
         impressions = int(merged_df['impressions'].sum())
         clicks = int(merged_df['clicks'].sum())
         views = int(merged_df['views'].sum())
+    elif campaign_id and merged_df.empty:
+        campaign_name = get_campaign_name(engine=engine, campaign_id=campaign_id)
+        impressions = 0
+        clicks = 0
+        views = 0
     else:
-        campaign_name = 'All'
+        campaign_name = merged_df['campaign_name_x'].iloc[0]
         impressions = int(merged_df['impressions'].sum())
         clicks = int(merged_df['clicks'].sum())
         views = int(merged_df['views'].sum())
