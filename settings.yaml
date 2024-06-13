@@ -1,0 +1,6 @@
+db:
+    host: "hr-task-db.cqbarc8xc1jj.us-east-1.rds.amazonaws.com"
+    db: "hr-task"
+    port: 3306
+    user: "hr-task-user"
+    password: "adinTask2024!"

@@ -1,0 +1,6 @@
+sqlalchemy
+dynaconf
+json
+pandas
+datetime
+flask
