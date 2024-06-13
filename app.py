@@ -53,7 +53,7 @@ def create_queries_for_campaign_table(engine):
     
     return campaign_tables_df
 
-@app.route('/api/campaigns', methods=['GET'])
+@app.route('/')
 def get_campaigns():
     # Retrieve query parameters
     campaign_id = request.args.get('campaign_id')
