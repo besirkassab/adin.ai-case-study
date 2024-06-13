@@ -133,7 +133,7 @@ def get_campaigns():
         'media': 'mean',
         'creative': 'mean'
     }).reset_index()
-    print(campaign_summary.to_string())
+
     campaign_summary.columns = ['campaign_id', 'start_date', 'end_date', 'campaign_name', 'effectiveness', 'media', 'creative']
     campaign_summary['start_date'] = campaign_summary['start_date'].astype(str)
     campaign_summary['end_date'] = campaign_summary['end_date'].astype(str)
