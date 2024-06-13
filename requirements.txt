@@ -1,6 +1,5 @@
-sqlalchemy
-dynaconf
-json
-pandas
-datetime
-flask
+sqlalchemy==2.0.23
+dynaconf==3.2.3
+pandas==1.5.3
+datetime==5.2
+flask==3.0.0
